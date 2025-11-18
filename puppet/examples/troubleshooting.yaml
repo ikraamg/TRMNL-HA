@@ -1,0 +1,249 @@
+# Troubleshooting Configuration
+# Examples of common issues and how to fix them with configuration tweaks
+#
+# Use this file as a reference when your images aren't looking quite right
+# on your e-ink display. Each schedule demonstrates a specific fix.
+
+name: "Puppet"
+version: "2.0.0"
+slug: "puppet"
+
+access_token: "YOUR_LONG_LIVED_ACCESS_TOKEN_HERE"
+home_assistant_url: "http://homeassistant:8123"
+
+schedules:
+
+  # ISSUE: Images are too dark on e-ink
+  # FIX: Increase black_level to crush dark grays to black
+  - name: "Fix: Images Too Dark"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display1.local/upload"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+      gamma_correction: true
+
+      # Crush darker grays to pure black
+      black_level: 15
+      white_level: 100
+
+  # ISSUE: Images are too light/washed out
+  # FIX: Decrease white_level to crush light grays to white
+  - name: "Fix: Images Too Light"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display2.local/upload"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+      gamma_correction: true
+
+      # Crush lighter grays to pure white
+      black_level: 0
+      white_level: 85
+
+  # ISSUE: Not enough contrast
+  # FIX: Crush both blacks and whites for maximum contrast
+  - name: "Fix: Low Contrast"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display3.local/upload"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+      gamma_correction: true
+
+      # Aggressive contrast adjustment
+      black_level: 20
+      white_level: 80
+
+  # ISSUE: Images look grainy/noisy
+  # FIX: Use ordered dithering or increase bit depth
+  - name: "Fix: Grainy Images"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display4.local/upload"
+
+    dithering:
+      enabled: true
+
+      # Option 1: Use ordered dithering (less grain)
+      # method: ordered
+
+      # Option 2: Increase bit depth (more grays = smoother)
+      method: floyd-steinberg
+      bit_depth: 4  # Changed from 2 to 4
+
+      gamma_correction: true
+
+  # ISSUE: Images have visible dot patterns
+  # FIX: Switch from ordered to Floyd-Steinberg
+  - name: "Fix: Dot Patterns"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display5.local/upload"
+
+    dithering:
+      enabled: true
+
+      # Floyd-Steinberg has better visual quality than ordered
+      method: floyd-steinberg  # NOT ordered
+      bit_depth: 2
+      gamma_correction: true
+
+  # ISSUE: Images look different on e-ink than on screen
+  # FIX: Ensure gamma correction is enabled
+  - name: "Fix: Different from Screen"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display6.local/upload"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+
+      # CRITICAL: E-ink displays need gamma correction
+      # This removes the gamma curve that screens use
+      gamma_correction: true  # MUST be true for e-ink!
+
+  # ISSUE: Text is hard to read
+  # FIX: Use 1-bit (pure B&W) with aggressive contrast
+  - name: "Fix: Text Readability"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display7.local/upload"
+
+    # Use e-ink optimized theme
+    theme: "Graphite E-ink Light"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+
+      # Pure black & white for maximum text contrast
+      bit_depth: 1
+
+      gamma_correction: true
+      black_level: 10
+      white_level: 90
+
+  # ISSUE: Photos look posterized
+  # FIX: Increase bit depth to 4 or 8
+  - name: "Fix: Posterized Photos"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/photos"
+    viewport: "800x480"
+    webhook_url: "https://display8.local/upload"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+
+      # Use 4-bit or 8-bit for photos
+      bit_depth: 4  # or 8 for even better quality
+
+      gamma_correction: true
+
+  # ISSUE: Dashboard not fully loading before screenshot
+  # FIX: Increase wait time
+  - name: "Fix: Incomplete Dashboard"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display9.local/upload"
+
+    # Wait longer for dashboard to fully render
+    # Default is auto (~750ms warm, ~2500ms cold)
+    wait: 5000  # 5 seconds
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+      gamma_correction: true
+
+  # ISSUE: File sizes too large
+  # FIX: Use 2-bit or 1-bit, or switch to JPEG
+  - name: "Fix: Large File Sizes"
+    cron: "*/10 * * * *"
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display10.local/upload"
+
+    # Option 1: Use JPEG (smallest)
+    format: jpeg
+
+    # Option 2: Use lower bit depth (if PNG required)
+    # format: png
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2  # 2-bit = smaller than 4-bit or 8-bit
+      gamma_correction: true
+
+  # ISSUE: Ghosting on e-ink display
+  # NOTE: This is a display issue, not configuration
+  # But you can reduce frequency to minimize ghosting
+  - name: "Fix: Reduce Ghosting"
+
+    # Update less frequently to reduce ghosting
+    cron: "0 */6 * * *"  # Every 6 hours instead of every 10 minutes
+
+    dashboard_path: "/lovelace/0"
+    viewport: "800x480"
+    webhook_url: "https://display11.local/upload"
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+
+      # Use 1-bit (fewer grays = less ghosting)
+      bit_depth: 1
+
+      gamma_correction: true
+      black_level: 15
+      white_level: 85
+
+# Quick Reference: Common Settings Combinations
+#
+# For general use (balanced):
+#   bit_depth: 2
+#   black_level: 0
+#   white_level: 100
+#
+# For high contrast (text-heavy):
+#   bit_depth: 1
+#   black_level: 10-20
+#   white_level: 80-90
+#
+# For photos (high quality):
+#   bit_depth: 4 or 8
+#   black_level: 0-5
+#   white_level: 95-100
+#
+# For fast updates (small files):
+#   bit_depth: 1 or 2
+#   format: jpeg
+#
+# Debugging Tips:
+# - Save both processed and original for comparison
+# - Test different bit_depth values (1, 2, 4, 8)
+# - Adjust black/white levels in increments of 5
+# - Use an e-ink optimized theme
+# - Check display specifications for supported grays

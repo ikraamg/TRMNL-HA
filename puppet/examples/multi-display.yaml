@@ -1,0 +1,162 @@
+# Multi-Display Configuration
+# Managing multiple e-ink displays with different schedules and settings
+#
+# This example shows how to configure different displays throughout your home,
+# each with its own schedule, viewport, and dithering settings.
+
+name: "Puppet"
+version: "2.0.0"
+slug: "puppet"
+
+access_token: "YOUR_LONG_LIVED_ACCESS_TOKEN_HERE"
+home_assistant_url: "http://homeassistant:8123"
+
+# Keep browser alive for better performance with multiple schedules
+keep_browser_open: true
+
+schedules:
+  # Kitchen Display - High frequency updates
+  - name: "Kitchen Dashboard"
+
+    # Update every 5 minutes during waking hours
+    cron: "*/5 6-23 * * *"
+
+    dashboard_path: "/lovelace/kitchen"
+    viewport: "800x480"
+    webhook_url: "https://kitchen-display.local/upload"
+
+    # Basic 2-bit for fast updates
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+      gamma_correction: true
+
+  # Living Room Display - Medium frequency, high quality
+  - name: "Living Room Dashboard"
+
+    # Update every 15 minutes
+    cron: "*/15 * * * *"
+
+    dashboard_path: "/lovelace/living-room"
+    viewport: "1072x1448"
+    webhook_url: "https://living-room-display.local/upload"
+
+    # High quality 4-bit
+    theme: "Graphite E-ink Light"
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 4
+      gamma_correction: true
+      black_level: 5
+      white_level: 95
+
+  # Bedroom Display - Low frequency, night mode
+  - name: "Bedroom Dashboard"
+
+    # Update every hour
+    cron: "0 * * * *"
+
+    dashboard_path: "/lovelace/bedroom"
+    viewport: "600x800"
+    webhook_url: "https://bedroom-display.local/upload"
+
+    # Dark theme for bedroom
+    theme: "Graphite E-ink Dark"
+    dark: true
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 2
+      gamma_correction: true
+
+  # Office Display - Business hours only, rotated
+  - name: "Office Dashboard"
+
+    # Update every 10 minutes, Mon-Fri, 8 AM - 6 PM only
+    cron: "*/10 8-18 * * 1-5"
+
+    dashboard_path: "/lovelace/office"
+    viewport: "1024x768"
+    webhook_url: "https://office-display.local/upload"
+
+    # Rotate 90 degrees for landscape mounting
+    rotate: 90
+
+    # Zoom out to show more
+    zoom: 0.85
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 4
+      gamma_correction: true
+
+  # Entryway Display - Weather & calendar, low frequency
+  - name: "Entryway Dashboard"
+
+    # Update 4 times per day
+    cron: "0 6,12,18,22 * * *"
+
+    dashboard_path: "/lovelace/entryway"
+    viewport: "400x640"
+    webhook_url: "https://entryway-display.local/upload"
+
+    lang: "en"
+
+    # Pure B&W for simple dashboard with high contrast
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 1  # Pure black & white
+      gamma_correction: true
+
+      # Aggressive contrast for calendar/weather icons
+      black_level: 15
+      white_level: 85
+
+  # Garage Display - Security camera view, frequent updates
+  - name: "Garage Camera Feed"
+
+    # Update every 2 minutes during day
+    cron: "*/2 6-22 * * *"
+
+    dashboard_path: "/lovelace/garage"
+    viewport: "1280x800"
+    webhook_url: "https://garage-display.local/upload"
+
+    # JPEG for camera feeds (smaller file size)
+    format: jpeg
+
+    # More wait time for camera to load
+    wait: 4000
+
+    dithering:
+      enabled: true
+      method: floyd-steinberg
+      bit_depth: 4  # Need more grays for camera image
+      gamma_correction: true
+
+# Tips for Multi-Display Setup:
+#
+# Performance:
+# - Stagger cron schedules to avoid simultaneous updates
+# - Use keep_browser_open: true for faster updates
+# - Adjust wait times based on dashboard complexity
+#
+# Quality:
+# - Use 2-bit for frequently updating displays (kitchen)
+# - Use 4-bit for main displays with photos (living room)
+# - Use 1-bit for simple text/icons (calendar)
+#
+# Scheduling:
+# - Use time ranges to save power (bedroom at night)
+# - Use day-of-week filters for office displays
+# - Adjust frequency based on dashboard type
+#
+# Webhooks:
+# - Each display should have unique webhook URL
+# - Use local URLs (.local) for faster uploads
+# - Ensure displays are accessible from add-on
