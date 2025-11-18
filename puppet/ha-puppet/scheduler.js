@@ -71,6 +71,7 @@ export class Scheduler {
         lang: schedule.lang,
         theme: schedule.theme,
         dark: schedule.dark || false,
+        dithering: schedule.dithering, // Pass dithering config if present
       };
 
       // Navigate to the page
