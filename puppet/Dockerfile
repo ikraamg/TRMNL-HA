@@ -46,5 +46,5 @@ COPY ha-puppet/ .
 # ENV PUPPETEER_EXECUTABLE_PATH="/usr/bin/chromium"
 
 # Run the application
-CMD ["node", "http.js"]
+CMD ["node", "main.js"]
 

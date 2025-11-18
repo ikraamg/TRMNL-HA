@@ -1,6 +1,6 @@
 {
   "name": "ha-puppet",
-  "version": "2.0.0",
+  "version": "2.3.0",
   "description": "Home Assistant screenshot automation with advanced dithering for e-ink displays",
   "type": "module",
   "main": "main.js",

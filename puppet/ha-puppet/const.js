@@ -23,12 +23,6 @@ export const chromiumExecutable = isAddOn ? "/usr/bin/chromium" : (options.chrom
 
 export const keepBrowserOpen = options.keep_browser_open || false;
 
-export const schedules = options.schedules || [];
-
 if (!hassToken) {
   console.warn("No access token configured. UI will show configuration instructions.");
-}
-
-if (schedules.length === 0) {
-  console.warn("No schedules configured. Add schedules in the configuration to enable automated screenshot uploads.");
 }
