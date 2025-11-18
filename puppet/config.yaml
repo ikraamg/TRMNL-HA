@@ -1,6 +1,6 @@
 name: "Puppet"
-description: "Turn dashboards into nice pictures"
-version: "2.2.0"
+description: "Turn dashboards into nice pictures with advanced e-ink dithering"
+version: "2.0.0"
 slug: "puppet"
 homeassistant_api: true
 init: false
@@ -14,7 +14,34 @@ options:
   access_token: ""
   keep_browser_open: false
   home_assistant_url: "http://homeassistant:8123"
+  schedules: []
 schema:
   access_token: str
   keep_browser_open: bool
   home_assistant_url: str
+  schedules:
+    - name: str?
+      cron: str
+      dashboard_path: str
+      viewport: str
+      webhook_url: str
+      wait: int?
+      format: list(png|jpeg|webp|bmp)?
+      rotate: int?
+      zoom: float?
+      lang: str?
+      theme: str?
+      dark: bool?
+
+      # Legacy e-ink options (deprecated - use dithering instead)
+      eink_colors: int?
+      invert: bool?
+
+      # Advanced dithering options (recommended for e-ink displays)
+      dithering:
+        enabled: bool?
+        method: list(floyd-steinberg|ordered|none)?
+        bit_depth: list(1|2|4|8)?
+        gamma_correction: bool?
+        black_level: int(0,100)?
+        white_level: int(0,100)?
