@@ -360,32 +360,6 @@ export class Browser {
     }
   }
 
-  /**
-   * Take a screenshot of the current page and apply processing
-   *
-   * NOTE: This is a performance-critical method used in scheduled pipelines
-   * AI: When modifying, preserve the image processing order:
-   *     1. Rotate (if requested)
-   *     2. Legacy e-ink (for backward compatibility)
-   *     3. Advanced dithering (new feature)
-   *     4. Format conversion
-   *
-   * @param {Object} options - Screenshot options
-   * @param {Object} options.viewport - Viewport dimensions
-   * @param {number} [options.einkColors] - Legacy e-ink color count (deprecated, use dithering)
-   * @param {boolean} [options.invert] - Legacy invert colors (deprecated)
-   * @param {number} [options.zoom] - Zoom level
-   * @param {string} [options.format] - Output format (png, jpeg, webp, bmp)
-   * @param {number} [options.rotate] - Rotation angle (90, 180, 270)
-   * @param {Object} [options.dithering] - Advanced dithering options
-   * @param {boolean} [options.dithering.enabled] - Enable advanced dithering
-   * @param {string} [options.dithering.method] - Dithering method (floyd-steinberg, ordered, none)
-   * @param {number} [options.dithering.bitDepth] - Target bit depth (1, 2, 4, 8)
-   * @param {boolean} [options.dithering.gammaCorrection] - Remove gamma for e-ink
-   * @param {number} [options.dithering.blackLevel] - Black crush level (0-100)
-   * @param {number} [options.dithering.whiteLevel] - White crush level (0-100)
-   * @returns {Promise<{image: Buffer, time: number}>} Screenshot buffer and timing
-   */
   async screenshotPage({ viewport, einkColors, invert, zoom, format, rotate, dithering }) {
     let start = new Date();
     if (this.busy) {
@@ -419,9 +393,53 @@ export class Browser {
         sharpInstance = sharpInstance.rotate(rotate);
       }
 
-      // Legacy e-ink processing (maintained for backward compatibility)
-      // NOTE: This is deprecated in favor of advanced dithering
-      // AI: Do not remove this - needed for existing configs
+      // Apply advanced dithering if enabled
+      if (dithering?.enabled) {
+        // Convert to PNG buffer for dithering
+        image = await sharpInstance.png().toBuffer();
+
+        const startDither = Date.now();
+        image = await applyDithering(image, {
+          method: dithering.method || 'floyd-steinberg',
+          bitDepth: dithering.bitDepth || 2,
+          gammaCorrection: dithering.gammaCorrection !== false,
+          blackLevel: dithering.blackLevel || 0,
+          whiteLevel: dithering.whiteLevel || 100,
+        });
+        console.debug(`Advanced dithering took ${Date.now() - startDither}ms`);
+
+        // Create new sharp instance from dithered image
+        sharpInstance = sharp(image);
+
+        // Convert to requested format
+        if (format === "jpeg") {
+          sharpInstance = sharpInstance.jpeg();
+          image = await sharpInstance.toBuffer();
+        } else if (format === "webp") {
+          sharpInstance = sharpInstance.webp();
+          image = await sharpInstance.toBuffer();
+        } else if (format === "bmp") {
+          sharpInstance = sharpInstance.raw();
+          const { data, info } = await sharpInstance.toBuffer({
+            resolveWithObject: true,
+          });
+          const bitsPerPixel = dithering.bitDepth === 1 ? 1 :
+                               dithering.bitDepth === 2 ? 2 :
+                               dithering.bitDepth === 4 ? 4 : 8;
+          const bmpEncoder = new BMPEncoder(info.width, info.height, bitsPerPixel);
+          image = bmpEncoder.encode(data);
+        } else {
+          sharpInstance = sharpInstance.png();
+          image = await sharpInstance.toBuffer();
+        }
+
+        return {
+          image,
+          time: Date.now() - start.getTime(),
+        };
+      }
+
+      // Legacy e-ink processing for backward compatibility
       if (einkColors === 2) {
         sharpInstance = sharpInstance.threshold(220, {
           greyscale: true,
@@ -433,31 +451,8 @@ export class Browser {
         }
       }
 
-      // Convert to buffer before dithering (if needed)
-      if (dithering?.enabled) {
-        // Get buffer from Sharp processing so far
-        image = await sharpInstance.png().toBuffer();
-
-        // Apply advanced dithering
-        const ditherStart = Date.now();
-        image = await applyDithering(image, {
-          method: dithering.method || 'floyd-steinberg',
-          bitDepth: dithering.bitDepth || 4,
-          gammaCorrection: dithering.gammaCorrection !== false, // default true
-          blackLevel: dithering.blackLevel || 0,
-          whiteLevel: dithering.whiteLevel || 100,
-        });
-        const ditherTime = Date.now() - ditherStart;
-        console.log(`Advanced dithering took ${ditherTime}ms`);
-
-        // Create new sharp instance with dithered image
-        sharpInstance = sharp(image);
-      }
-
-      // Legacy eink color output processing
-      // NOTE: This path is for backward compatibility with old configs
-      // AI: Do not remove - needed for existing einkColors configs
-      if (einkColors && !dithering?.enabled) {
+      // Legacy eink color output processing for backward compatibility
+      if (einkColors) {
         if (einkColors === 2) {
           sharpInstance = sharpInstance.toColourspace("b-w");
         }
@@ -508,8 +503,7 @@ export class Browser {
         });
         const bmpEncoder = new BMPEncoder(info.width, info.height, 24);
         image = bmpEncoder.encode(data);
-      } else if (!dithering?.enabled) {
-        // Only convert to PNG if we haven't already (dithering returns PNG)
+      } else {
         sharpInstance = sharpInstance.png();
         image = await sharpInstance.toBuffer();
       }

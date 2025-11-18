@@ -3,6 +3,12 @@ import { Browser } from "./screenshot.js";
 import { isAddOn, hassUrl, hassToken, keepBrowserOpen } from "./const.js";
 import { CannotOpenPageError } from "./error.js";
 import { handleUIRequest } from "./ui.js";
+import {
+  loadSchedules,
+  createSchedule,
+  updateSchedule,
+  deleteSchedule,
+} from "./lib/scheduleStore.js";
 
 // Maximum number of next requests to keep in memory
 const MAX_NEXT_REQUESTS = 100;
@@ -61,6 +67,90 @@ class RequestHandler {
     );
   }
 
+  // Handle /api/schedules endpoint
+  async handleSchedulesAPI(request, response) {
+    response.setHeader("Content-Type", "application/json");
+
+    if (request.method === "GET") {
+      const schedules = loadSchedules();
+      response.writeHead(200);
+      response.end(JSON.stringify(schedules));
+      return;
+    }
+
+    if (request.method === "POST") {
+      try {
+        const body = await this.readRequestBody(request);
+        const schedule = JSON.parse(body);
+        const created = createSchedule(schedule);
+        response.writeHead(201);
+        response.end(JSON.stringify(created));
+      } catch (err) {
+        response.writeHead(400);
+        response.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+
+    response.writeHead(405);
+    response.end(JSON.stringify({ error: "Method not allowed" }));
+  }
+
+  // Handle /api/schedules/:id endpoint
+  async handleScheduleAPI(request, response, requestUrl) {
+    response.setHeader("Content-Type", "application/json");
+
+    const id = requestUrl.pathname.split("/").pop();
+
+    if (request.method === "PUT") {
+      try {
+        const body = await this.readRequestBody(request);
+        const updates = JSON.parse(body);
+        const updated = updateSchedule(id, updates);
+        if (!updated) {
+          response.writeHead(404);
+          response.end(JSON.stringify({ error: "Schedule not found" }));
+          return;
+        }
+        response.writeHead(200);
+        response.end(JSON.stringify(updated));
+      } catch (err) {
+        response.writeHead(400);
+        response.end(JSON.stringify({ error: err.message }));
+      }
+      return;
+    }
+
+    if (request.method === "DELETE") {
+      const deleted = deleteSchedule(id);
+      if (!deleted) {
+        response.writeHead(404);
+        response.end(JSON.stringify({ error: "Schedule not found" }));
+        return;
+      }
+      response.writeHead(200);
+      response.end(JSON.stringify({ success: true }));
+      return;
+    }
+
+    response.writeHead(405);
+    response.end(JSON.stringify({ error: "Method not allowed" }));
+  }
+
+  // Helper to read request body
+  readRequestBody(request) {
+    return new Promise((resolve, reject) => {
+      let body = "";
+      request.on("data", (chunk) => {
+        body += chunk.toString();
+      });
+      request.on("end", () => {
+        resolve(body);
+      });
+      request.on("error", reject);
+    });
+  }
+
   async handleRequest(request, response) {
     const requestUrl = new URL(request.url, "http://localhost");
 
@@ -72,6 +162,17 @@ class RequestHandler {
 
     if (requestUrl.pathname === "/") {
       await handleUIRequest(response);
+      return;
+    }
+
+    // API endpoints for schedule management
+    if (requestUrl.pathname === "/api/schedules") {
+      await this.handleSchedulesAPI(request, response);
+      return;
+    }
+
+    if (requestUrl.pathname.startsWith("/api/schedules/")) {
+      await this.handleScheduleAPI(request, response, requestUrl);
       return;
     }
 
@@ -132,6 +233,32 @@ class RequestHandler {
       const theme = requestUrl.searchParams.get("theme") || undefined;
       const dark = requestUrl.searchParams.has("dark");
 
+      // Parse dithering parameters
+      const ditheringEnabled = requestUrl.searchParams.has("dithering");
+      const ditherMethod = requestUrl.searchParams.get("dither_method") || "floyd-steinberg";
+      let bitDepth = parseInt(requestUrl.searchParams.get("bit_depth"));
+      if (isNaN(bitDepth) || ![1, 2, 4, 8].includes(bitDepth)) {
+        bitDepth = 2;
+      }
+      const gammaCorrection = !requestUrl.searchParams.has("no_gamma");
+      let blackLevel = parseInt(requestUrl.searchParams.get("black_level"));
+      if (isNaN(blackLevel) || blackLevel < 0 || blackLevel > 100) {
+        blackLevel = 0;
+      }
+      let whiteLevel = parseInt(requestUrl.searchParams.get("white_level"));
+      if (isNaN(whiteLevel) || whiteLevel < 0 || whiteLevel > 100) {
+        whiteLevel = 100;
+      }
+
+      const dithering = ditheringEnabled ? {
+        enabled: true,
+        method: ditherMethod,
+        bitDepth,
+        gammaCorrection,
+        blackLevel,
+        whiteLevel,
+      } : undefined;
+
       const requestParams = {
         pagePath: requestUrl.pathname,
         viewport: { width: viewportParams[0], height: viewportParams[1] },
@@ -144,6 +271,7 @@ class RequestHandler {
         lang,
         theme,
         dark,
+        dithering,
       };
 
       // Extract next param and schedule if necessary

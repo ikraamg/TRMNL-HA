@@ -1,0 +1,46 @@
+[
+  {
+    "name": "New Schedules",
+    "cron": "*/10 * * * *",
+    "dashboard_path": "/lovelace/0",
+    "viewport": {
+      "width": 1000,
+      "height": 1024
+    },
+    "webhook_url": "",
+    "format": "png",
+    "dithering": {
+      "enabled": true,
+      "method": "floyd-steinberg",
+      "bitDepth": 2,
+      "gammaCorrection": true,
+      "blackLevel": 4,
+      "whiteLevel": 81
+    },
+    "id": "schedule_1763499723490_6w2sbbjzm",
+    "createdAt": "2025-11-18T21:02:03.490Z",
+    "updatedAt": "2025-11-18T21:04:25.917Z"
+  },
+  {
+    "name": "New Schedule",
+    "cron": "*/10 * * * *",
+    "dashboard_path": "config/areas/area/asdfasdf",
+    "viewport": {
+      "width": 758,
+      "height": 1024
+    },
+    "webhook_url": "",
+    "format": "png",
+    "dithering": {
+      "enabled": true,
+      "method": "floyd-steinberg",
+      "bitDepth": 2,
+      "gammaCorrection": true,
+      "blackLevel": 0,
+      "whiteLevel": 100
+    },
+    "id": "schedule_1763499803072_1wtmqzi8u",
+    "createdAt": "2025-11-18T21:03:23.072Z",
+    "updatedAt": "2025-11-18T21:03:35.223Z"
+  }
+]
