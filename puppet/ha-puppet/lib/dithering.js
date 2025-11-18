@@ -1,5 +1,4 @@
 import gm from 'gm';
-import { promisify } from 'util';
 
 /**
  * Dithering Module for E-ink Display Optimization
@@ -167,7 +166,15 @@ export async function applyDithering(imageBuffer, options = {}) {
     }
 
     // Convert to PNG and return buffer
-    const toBuffer = promisify(image.toBuffer.bind(image));
+    // NOTE: GM requires format parameter and callback-style API
+    const toBuffer = (format) => {
+      return new Promise((resolve, reject) => {
+        image.toBuffer(format, (err, buffer) => {
+          if (err) reject(err);
+          else resolve(buffer);
+        });
+      });
+    };
     const result = await toBuffer('PNG');
 
     // NOTE: Performance monitoring for optimization
