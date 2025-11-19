@@ -1,4 +1,4 @@
-# Puppet Add-on Dockerfile
+# TRMNL HA Add-on Dockerfile
 # Debian-based image with Chromium and Node.js for Puppeteer screenshot automation
 
 FROM debian:bullseye-slim
@@ -39,11 +39,11 @@ RUN apt-get update && apt-get install -y \
 WORKDIR /app
 
 # Install dependencies first for better caching
-COPY ha-puppet/package*.json ./
+COPY ha-trmnl/package*.json ./
 RUN npm ci --unsafe-perm
 
 # Copy application code
-COPY ha-puppet/ .
+COPY ha-trmnl/ .
 
 # =============================================================================
 # RUNTIME

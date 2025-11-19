@@ -1,5 +1,5 @@
 /**
- * Web UI request handler for the Puppet add-on
+ * Web UI request handler for the TRMNL HA add-on
  * Serves the configuration interface and error pages
  * @module ui
  */
@@ -54,7 +54,7 @@ function generateConfigInstructions(action) {
         <strong>${action} the Add-on Configuration:</strong>
         <ul class="ml-6 mt-2 space-y-1 list-disc list-inside text-sm">
           <li>Go to Settings → Add-ons</li>
-          <li>Click on the Puppet add-on</li>
+          <li>Click on the TRMNL HA add-on</li>
           <li>Go to the Configuration tab</li>
           <li>${action === "Configure" ? "Paste" : "Update"} your token in the "access_token" field</li>
           <li>Save and restart the add-on</li>

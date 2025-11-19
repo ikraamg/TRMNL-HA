@@ -1,5 +1,5 @@
 /**
- * Configuration constants for the Puppet add-on
+ * Configuration constants for the TRMNL HA add-on
  * @module const
  */
 

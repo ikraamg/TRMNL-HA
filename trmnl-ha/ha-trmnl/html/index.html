@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <title>Puppet - Schedule Manager</title>
+    <title>TRMNL HA - Schedule Manager</title>
 
     <script src="https://cdn.tailwindcss.com"></script>
 
@@ -71,7 +71,7 @@
       <!-- Footer -->
       <div class="mt-6 text-center">
         <a
-          href="https://github.com/balloob/home-assistant-addons/blob/main/puppet/README.md"
+          href="https://usetrmnl.com"
           target="_blank"
           rel="noopener noreferrer"
           class="
@@ -79,17 +79,17 @@
             hover:opacity-100 transition-opacity
           "
         >
-          Puppet by Balloob
+          TRMNL HA
         </a>
       </div>
     </div>
 
     <script>
       /**
-       * Puppet Schedule Manager - Client-side JavaScript
+       * TRMNL HA Schedule Manager - Client-side JavaScript
        *
        * Manages schedule configuration, preview generation, and API communication
-       * for the Puppet screenshot add-on.
+       * for the TRMNL HA add-on.
        */
 
       // =============================================================================
@@ -103,7 +103,7 @@
       let activeScheduleId = null;
 
       /** @type {boolean} Whether to auto-refresh preview on changes */
-      let autoRefresh = localStorage.getItem('puppetAutoRefresh') === 'true';
+      let autoRefresh = localStorage.getItem('trmnlAutoRefresh') === 'true';
 
       // =============================================================================
       // API FUNCTIONS
@@ -460,7 +460,7 @@
        */
       function toggleAutoRefresh(enabled) {
         autoRefresh = enabled;
-        localStorage.setItem('puppetAutoRefresh', enabled);
+        localStorage.setItem('trmnlAutoRefresh', enabled);
         if (enabled) {
           loadPreview();
         }

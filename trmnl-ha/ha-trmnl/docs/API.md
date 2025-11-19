@@ -1,6 +1,6 @@
 # API Reference
 
-Complete API reference for all public modules and functions in the Puppet add-on.
+Complete API reference for all public modules and functions in the TRMNL HA add-on.
 
 ## Table of Contents
 

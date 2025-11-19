@@ -31,7 +31,7 @@ assignees: ''
 - Version:
 - Installation Type: (Home Assistant OS / Supervised / Container / Core)
 
-**Puppet Add-on:**
+**TRMNL HA Add-on:**
 - Version:
 - Configuration:
 ```yaml
@@ -52,7 +52,7 @@ assignees: ''
 <summary>Add-on Logs</summary>
 
 ```
-Paste add-on logs here (check in Home Assistant Supervisor -> Puppet -> Logs)
+Paste add-on logs here (check in Home Assistant Supervisor -> TRMNL HA -> Logs)
 ```
 
 </details>

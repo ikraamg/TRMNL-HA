@@ -1,5 +1,5 @@
 /**
- * Custom error classes for the Puppet add-on
+ * Custom error classes for the TRMNL HA add-on
  * @module error
  */
 

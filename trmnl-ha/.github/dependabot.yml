@@ -3,14 +3,14 @@ version: 2
 updates:
   # Enable version updates for npm
   - package-ecosystem: "npm"
-    directory: "/puppet/ha-puppet"
+    directory: "/trmnl-ha/ha-trmnl"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 10
     reviewers:
-      - "ikraam"
+      - "ikraamg"
     labels:
       - "dependencies"
       - "npm"
@@ -20,14 +20,14 @@ updates:
 
   # Enable version updates for Docker
   - package-ecosystem: "docker"
-    directory: "/puppet"
+    directory: "/trmnl-ha"
     schedule:
       interval: "weekly"
       day: "monday"
       time: "09:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "ikraam"
+      - "ikraamg"
     labels:
       - "dependencies"
       - "docker"
@@ -43,7 +43,7 @@ updates:
       time: "09:00"
     open-pull-requests-limit: 5
     reviewers:
-      - "ikraam"
+      - "ikraamg"
     labels:
       - "dependencies"
       - "github-actions"

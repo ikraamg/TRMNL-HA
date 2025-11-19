@@ -1,4 +1,4 @@
-# Implementation Summary: Advanced Dithering for Puppet Add-on
+# Implementation Summary: Advanced Dithering for TRMNL HA Add-on
 
 **Version:** 2.0.0
 **Date:** November 18, 2025
@@ -8,7 +8,7 @@
 
 ## 🎉 Overview
 
-Successfully implemented professional-grade advanced dithering capabilities for the Puppet Home Assistant add-on, transforming it into a best-in-class solution for e-ink display screenshot automation.
+Successfully implemented professional-grade advanced dithering capabilities for the TRMNL HA add-on, transforming it into a best-in-class solution for e-ink display screenshot automation.
 
 ---
 
@@ -523,7 +523,7 @@ PNG Buffer Output
 
 ## 🎯 Conclusion
 
-Successfully delivered a **production-ready, well-tested, professionally documented** advanced dithering system for the Puppet Home Assistant add-on. The implementation follows OSS best practices, achieves excellent code coverage, and provides a great developer experience for future contributors.
+Successfully delivered a **production-ready, well-tested, professionally documented** advanced dithering system for the TRMNL HA add-on. The implementation follows OSS best practices, achieves excellent code coverage, and provides a great developer experience for future contributors.
 
 **Status:** ✅ **COMPLETE AND READY FOR v2.0.0 RELEASE**
 

@@ -1,6 +1,6 @@
 # Testing Guide
 
-Comprehensive guide to testing the Puppet add-on, including unit tests, visual regression tests, and integration tests.
+Comprehensive guide to testing the TRMNL HA add-on, including unit tests, visual regression tests, and integration tests.
 
 ## Table of Contents
 

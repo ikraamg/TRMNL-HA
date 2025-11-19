@@ -1,7 +1,7 @@
 {
-  "name": "ha-puppet",
+  "name": "ha-trmnl",
   "version": "2.3.0",
-  "description": "Home Assistant screenshot automation with advanced dithering for e-ink displays",
+  "description": "Send dashboard screens to your TRMNL",
   "type": "module",
   "main": "main.js",
   "scripts": {

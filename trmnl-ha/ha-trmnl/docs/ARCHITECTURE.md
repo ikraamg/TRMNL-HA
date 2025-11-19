@@ -1,6 +1,6 @@
 # System Architecture
 
-This document provides a comprehensive overview of the Puppet add-on architecture, design decisions, and implementation details.
+This document provides a comprehensive overview of the TRMNL HA add-on architecture, design decisions, and implementation details.
 
 ## Table of Contents
 
@@ -15,7 +15,7 @@ This document provides a comprehensive overview of the Puppet add-on architectur
 
 ## High-Level Overview
 
-Puppet is a Home Assistant add-on that automates screenshot capture of dashboards and delivers them to external servers. It's optimized for e-ink displays with advanced dithering capabilities.
+TRMNL HA is a Home Assistant add-on that captures dashboard screenshots and sends them to your TRMNL device. It's optimized for e-ink displays with advanced dithering capabilities.
 
 ### Core Capabilities
 
@@ -37,7 +37,7 @@ Puppet is a Home Assistant add-on that automates screenshot capture of dashboard
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    Puppet Add-on                        │
+│                    TRMNL HA Add-on                      │
 ├─────────────────────────────────────────────────────────┤
 │                                                          │
 │  ┌──────────────┐         ┌──────────────┐             │

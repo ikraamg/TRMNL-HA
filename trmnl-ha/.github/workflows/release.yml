@@ -19,7 +19,7 @@ jobs:
         with:
           node-version: '23'
           cache: 'npm'
-          cache-dependency-path: puppet/ha-puppet/package-lock.json
+          cache-dependency-path: trmnl-ha/ha-trmnl/package-lock.json
 
       - name: Install GraphicsMagick
         run: |
@@ -27,11 +27,11 @@ jobs:
           sudo apt-get install -y graphicsmagick
 
       - name: Install dependencies
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm ci
 
       - name: Run all tests
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm test
 
   build-and-publish:
@@ -63,18 +63,18 @@ jobs:
       - name: Build and push Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./puppet
-          file: ./puppet/Dockerfile
+          context: ./trmnl-ha
+          file: ./trmnl-ha/Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/puppet:latest
-            ghcr.io/${{ github.repository_owner }}/puppet:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository_owner }}/trmnl-ha:latest
+            ghcr.io/${{ github.repository_owner }}/trmnl-ha:${{ steps.version.outputs.VERSION }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
-            org.opencontainers.image.title=Puppet
-            org.opencontainers.image.description=Home Assistant add-on for scheduled dashboard screenshots with advanced dithering
+            org.opencontainers.image.title=TRMNL HA
+            org.opencontainers.image.description=Send dashboard screens to your TRMNL
             org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.revision=${{ github.sha }}
@@ -124,5 +124,5 @@ jobs:
         run: |
           echo "🎉 Release v${{ steps.version.outputs.VERSION }} published!"
           echo "Docker images available at:"
-          echo "  - ghcr.io/${{ github.repository_owner }}/puppet:latest"
-          echo "  - ghcr.io/${{ github.repository_owner }}/puppet:${{ steps.version.outputs.VERSION }}"
+          echo "  - ghcr.io/${{ github.repository_owner }}/trmnl-ha:latest"
+          echo "  - ghcr.io/${{ github.repository_owner }}/trmnl-ha:${{ steps.version.outputs.VERSION }}"

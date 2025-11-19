@@ -1,6 +1,6 @@
-# Contributing to Puppet Add-on
+# Contributing to TRMNL HA Add-on
 
-First off, thank you for considering contributing to Puppet! It's people like you that make this add-on better for everyone in the Home Assistant community. 🎉
+First off, thank you for considering contributing to TRMNL HA! It's people like you that make this add-on better for everyone in the Home Assistant community. 🎉
 
 ## Table of Contents
 
@@ -36,8 +36,8 @@ This project adheres to a simple code of conduct: **Be excellent to each other.*
 
 1. **Fork and Clone**
    ```bash
-   git clone https://github.com/YOUR_USERNAME/puppet.git
-   cd puppet/ha-puppet
+   git clone https://github.com/YOUR_USERNAME/home-assistant-addons.git
+   cd home-assistant-addons/trmnl-ha/ha-trmnl
    ```
 
 2. **Install Dependencies**
@@ -62,7 +62,7 @@ This project adheres to a simple code of conduct: **Be excellent to each other.*
 ### Project Structure
 
 ```
-ha-puppet/
+ha-trmnl/
 ├── lib/                    # Core libraries
 │   └── dithering.js       # Image dithering module
 ├── tests/

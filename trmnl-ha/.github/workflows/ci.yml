@@ -20,14 +20,14 @@ jobs:
         with:
           node-version: '23'
           cache: 'npm'
-          cache-dependency-path: puppet/ha-puppet/package-lock.json
+          cache-dependency-path: trmnl-ha/ha-trmnl/package-lock.json
 
       - name: Install dependencies
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm ci
 
       - name: Run ESLint
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm run lint
 
   test:
@@ -43,7 +43,7 @@ jobs:
         with:
           node-version: '23'
           cache: 'npm'
-          cache-dependency-path: puppet/ha-puppet/package-lock.json
+          cache-dependency-path: trmnl-ha/ha-trmnl/package-lock.json
 
       - name: Install GraphicsMagick
         run: |
@@ -54,27 +54,27 @@ jobs:
         run: gm version
 
       - name: Install dependencies
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm ci
 
       - name: Run unit tests
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm run test:unit
 
       - name: Run visual tests
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm run test:visual
 
       - name: Run coverage
-        working-directory: puppet/ha-puppet
+        working-directory: trmnl-ha/ha-trmnl
         run: npm run test:coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./puppet/ha-puppet/coverage/lcov.info
+          files: ./trmnl-ha/ha-trmnl/coverage/lcov.info
           flags: unittests
-          name: codecov-puppet
+          name: codecov-trmnl-ha
           fail_ci_if_error: false
         env:
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
@@ -85,8 +85,8 @@ jobs:
         with:
           name: test-results
           path: |
-            puppet/ha-puppet/coverage/
-            puppet/ha-puppet/tests/visual/output/
+            trmnl-ha/ha-trmnl/coverage/
+            trmnl-ha/ha-trmnl/tests/visual/output/
           retention-days: 7
 
   build:
@@ -103,17 +103,17 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./puppet
-          file: ./puppet/Dockerfile
+          context: ./trmnl-ha
+          file: ./trmnl-ha/Dockerfile
           push: false
-          tags: local/puppet:test
+          tags: local/trmnl-ha:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Test Docker image
         run: |
-          docker run --rm local/puppet:test node --version
-          docker run --rm local/puppet:test gm version
+          docker run --rm local/trmnl-ha:test node --version
+          docker run --rm local/trmnl-ha:test gm version
 
   integration:
     name: Integration Tests
@@ -130,35 +130,35 @@ jobs:
       - name: Build Docker image
         uses: docker/build-push-action@v5
         with:
-          context: ./puppet
-          file: ./puppet/Dockerfile
+          context: ./trmnl-ha
+          file: ./trmnl-ha/Dockerfile
           push: false
-          tags: local/puppet:test
+          tags: local/trmnl-ha:test
           load: true
           cache-from: type=gha
 
       - name: Create test options.json
         run: |
-          mkdir -p /tmp/puppet-data
-          echo '{"access_token":"test_token","keep_browser_open":false,"home_assistant_url":"http://localhost:8123"}' > /tmp/puppet-data/options.json
+          mkdir -p /tmp/trmnl-ha-data
+          echo '{"access_token":"test_token","keep_browser_open":false,"home_assistant_url":"http://localhost:8123"}' > /tmp/trmnl-ha-data/options.json
 
       - name: Run container smoke test
         run: |
           docker run -d \
-            --name puppet-test \
+            --name trmnl-ha-test \
             -p 10000:10000 \
-            -v /tmp/puppet-data:/data \
-            local/puppet:test
+            -v /tmp/trmnl-ha-data:/data \
+            local/trmnl-ha:test
 
           # Wait for container to start
           sleep 5
 
           # Check if container is still running
-          docker ps | grep puppet-test
+          docker ps | grep trmnl-ha-test
 
           # Check logs for errors
-          docker logs puppet-test
+          docker logs trmnl-ha-test
 
           # Cleanup
-          docker stop puppet-test
-          docker rm puppet-test
+          docker stop trmnl-ha-test
+          docker rm trmnl-ha-test

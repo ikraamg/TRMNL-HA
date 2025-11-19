@@ -1,7 +1,7 @@
-name: "Puppet"
-description: "Turn dashboards into nice pictures with advanced e-ink dithering"
+name: "TRMNL HA"
+description: "Send dashboard screens to your TRMNL"
 version: "2.3.0"
-slug: "puppet"
+slug: "trmnl-ha"
 homeassistant_api: true
 init: false
 arch:
@@ -14,8 +14,8 @@ ingress_port: 10000
 ingress_stream: false
 
 # Sidebar integration
-panel_icon: "mdi:camera"
-panel_title: "Puppet"
+panel_icon: "mdi:monitor"
+panel_title: "TRMNL HA"
 
 # Keep ports for backward compatibility (optional direct access)
 ports:
