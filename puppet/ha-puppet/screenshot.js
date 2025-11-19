@@ -1,84 +1,138 @@
+/**
+ * Browser automation for capturing Home Assistant screenshots
+ * @module screenshot
+ */
+
 import puppeteer from "puppeteer";
-import sharp from "sharp"; // Import sharp
+import sharp from "sharp";
 import { BMPEncoder } from "./bmp.js";
-import { debug, isAddOn, chromiumExecutable } from "./const.js";
+import {
+  debug,
+  isAddOn,
+  chromiumExecutable,
+  HEADER_HEIGHT,
+  DEFAULT_WAIT_TIME,
+  COLD_START_EXTRA_WAIT
+} from "./const.js";
 import { CannotOpenPageError } from "./error.js";
 import { applyDithering } from "./lib/dithering.js";
 
-const HEADER_HEIGHT = 56;
+// =============================================================================
+// BROWSER CONFIGURATION
+// =============================================================================
 
-// These are JSON stringified values
-const hassLocalStorageDefaults = {
+/**
+ * Default localStorage values for Home Assistant UI
+ * Values are JSON stringified as they would appear in storage
+ */
+const HASS_LOCAL_STORAGE_DEFAULTS = {
   dockedSidebar: `"always_hidden"`,
-  selectedTheme: `{"dark": false}`,
+  selectedTheme: `{"dark": false}`
 };
 
-// From https://www.bannerbear.com/blog/ways-to-speed-up-puppeteer-screenshots/
-const puppeteerArgs = [
+/**
+ * Puppeteer launch arguments optimized for headless screenshot capture
+ * Based on: https://www.bannerbear.com/blog/ways-to-speed-up-puppeteer-screenshots/
+ */
+const PUPPETEER_ARGS = [
+  // Disable unnecessary background processes
   "--autoplay-policy=user-gesture-required",
   "--disable-background-networking",
   "--disable-background-timer-throttling",
   "--disable-backgrounding-occluded-windows",
   "--disable-breakpad",
-  "--disable-client-side-phishing-detection",
   "--disable-component-update",
   "--disable-default-apps",
+  "--disable-extensions",
+  "--disable-hang-monitor",
+  "--disable-renderer-backgrounding",
+
+  // Disable security features (safe in headless context)
+  "--disable-client-side-phishing-detection",
+  "--disable-setuid-sandbox",
+  "--no-sandbox",
+  "--no-zygote",
+
+  // Disable unneeded features
   "--disable-dev-shm-usage",
   "--disable-domain-reliability",
-  "--disable-extensions",
   "--disable-features=AudioServiceOutOfProcess",
-  "--disable-hang-monitor",
   "--disable-ipc-flooding-protection",
   "--disable-notifications",
   "--disable-offer-store-unmasked-wallet-cards",
   "--disable-popup-blocking",
   "--disable-print-preview",
   "--disable-prompt-on-repost",
-  "--disable-renderer-backgrounding",
-  "--disable-setuid-sandbox",
   "--disable-speech-api",
   "--disable-sync",
-  "--hide-scrollbars",
-  "--ignore-gpu-blacklist",
   "--metrics-recording-only",
   "--mute-audio",
   "--no-default-browser-check",
   "--no-first-run",
   "--no-pings",
-  "--no-sandbox",
-  "--no-zygote",
-  "--password-store=basic",
-  "--use-gl=swiftshader",
-  "--use-mock-keychain",
-];
-if (isAddOn) {
-  puppeteerArgs.push("--enable-low-end-device-mode");
-}
 
+  // UI optimizations
+  "--hide-scrollbars",
+  "--ignore-gpu-blacklist",
+  "--use-gl=swiftshader",
+
+  // Credential handling
+  "--password-store=basic",
+  "--use-mock-keychain",
+
+  // Add low-end device mode for resource-constrained environments
+  ...(isAddOn ? ["--enable-low-end-device-mode"] : [])
+];
+
+// =============================================================================
+// BROWSER CLASS
+// =============================================================================
+
+/**
+ * Manages Puppeteer browser instance for Home Assistant screenshots
+ * Handles browser lifecycle, page navigation, authentication, and image capture
+ * @class
+ */
 export class Browser {
+  /**
+   * @param {string} homeAssistantUrl - Base URL of Home Assistant instance
+   * @param {string} token - Long-lived access token for authentication
+   */
   constructor(homeAssistantUrl, token) {
     this.homeAssistantUrl = homeAssistantUrl;
     this.token = token;
+
+    /** @type {import('puppeteer').Browser|undefined} */
     this.browser = undefined;
+
+    /** @type {import('puppeteer').Page|undefined} */
     this.page = undefined;
+
+    /** @type {boolean} Whether browser is currently processing */
     this.busy = false;
 
-    // The last path we requested a screenshot for
-    // We store this instead of using page.url() because panels can redirect
-    // users, ie / -> /lovelace/0.
+    // Cache last requested values to avoid unnecessary page updates
+    // NOTE: We store path instead of using page.url() because panels can redirect (e.g., / -> /lovelace/0)
     this.lastRequestedPath = undefined;
     this.lastRequestedLang = undefined;
     this.lastRequestedTheme = undefined;
     this.lastRequestedDarkMode = undefined;
   }
 
+  // ===========================================================================
+  // BROWSER LIFECYCLE
+  // ===========================================================================
+
+  /**
+   * Cleans up browser and page resources
+   * Resets all cached state for fresh start
+   */
   async cleanup() {
     const { browser, page } = this;
 
-    if (!this.browser && !this.page) {
-      return;
-    }
+    if (!browser && !page) return;
 
+    // Reset all state
     this.page = undefined;
     this.browser = undefined;
     this.lastRequestedPath = undefined;
@@ -86,18 +140,15 @@ export class Browser {
     this.lastRequestedTheme = undefined;
     this.lastRequestedDarkMode = undefined;
 
+    // Close page first, then browser
     try {
-      if (page) {
-        await page.close();
-      }
+      if (page) await page.close();
     } catch (err) {
       console.error("Error closing page during cleanup:", err);
     }
 
     try {
-      if (browser) {
-        await browser.close();
-      }
+      if (browser) await browser.close();
     } catch (err) {
       console.error("Error closing browser during cleanup:", err);
     }
@@ -105,420 +156,481 @@ export class Browser {
     console.log("Closed browser");
   }
 
+  /**
+   * Gets or creates a Puppeteer page instance
+   * Launches browser on first call and sets up event logging
+   * @returns {Promise<import('puppeteer').Page>} The page instance
+   */
   async getPage() {
-    if (this.page) {
-      return this.page;
-    }
+    if (this.page) return this.page;
 
     console.log("Starting browser");
-    // We don't catch these errors on purpose, as we're
-    // not able to recover once the app fails to start.
+
+    // Launch browser - errors here are unrecoverable
     const browser = await puppeteer.launch({
       headless: "shell",
       executablePath: chromiumExecutable,
-      args: puppeteerArgs,
+      args: PUPPETEER_ARGS
     });
+
     const page = await browser.newPage();
 
-    // Route all log messages from browser to our add-on log
-    // https://pptr.dev/api/puppeteer.pageevents
-    page
-      .on("framenavigated", (frame) =>
-        // Why are we seeing so many frame navigated ??
-        console.log("Frame navigated", frame.url()),
-      )
-      .on("console", (message) =>
-        console.log(
-          `CONSOLE ${message
-            .type()
-            .substr(0, 3)
-            .toUpperCase()} ${message.text()}`,
-        ),
-      )
-      .on("error", (err) => console.error("ERROR", err))
-      .on("pageerror", ({ message }) => console.log("PAGE ERROR", message))
-      .on("requestfailed", (request) =>
-        console.log(
-          `REQUEST-FAILED ${request.failure().errorText} ${request.url()}`,
-        ),
-      );
-    if (debug)
-      page.on("response", (response) =>
-        console.log(
-          `RESPONSE ${response.status()} ${response.url()} (cache: ${response.fromCache()})`,
-        ),
-      );
+    // Set up event logging for debugging
+    this.setupPageLogging(page);
 
     this.browser = browser;
     this.page = page;
     return this.page;
   }
 
-  async navigatePage({
-    pagePath,
-    viewport,
-    extraWait,
-    zoom,
-    lang,
-    theme,
-    dark,
-  }) {
-    let start = new Date();
-    if (this.busy) {
-      throw new Error("Browser is busy");
+  /**
+   * Configures page event handlers for logging
+   * @param {import('puppeteer').Page} page - Puppeteer page instance
+   * @private
+   */
+  setupPageLogging(page) {
+    page
+      .on("framenavigated", (frame) =>
+        console.log("Frame navigated", frame.url())
+      )
+      .on("console", (message) =>
+        console.log(`CONSOLE ${message.type().slice(0, 3).toUpperCase()} ${message.text()}`)
+      )
+      .on("error", (err) => console.error("ERROR", err))
+      .on("pageerror", ({ message }) => console.log("PAGE ERROR", message))
+      .on("requestfailed", (request) =>
+        console.log(`REQUEST-FAILED ${request.failure().errorText} ${request.url()}`)
+      );
+
+    // Verbose response logging in debug mode
+    if (debug) {
+      page.on("response", (response) =>
+        console.log(`RESPONSE ${response.status()} ${response.url()} (cache: ${response.fromCache()})`)
+      );
     }
-    start = new Date();
+  }
+
+  // ===========================================================================
+  // NAVIGATION HELPERS
+  // ===========================================================================
+
+  /**
+   * Builds auth token localStorage object for Home Assistant
+   * @returns {Object} localStorage entries to inject
+   * @private
+   */
+  buildAuthStorage() {
+    const clientId = new URL("/", this.homeAssistantUrl).toString();
+    const hassUrl = clientId.slice(0, -1); // Remove trailing slash
+
+    return {
+      ...HASS_LOCAL_STORAGE_DEFAULTS,
+      hassTokens: JSON.stringify({
+        access_token: this.token,
+        token_type: "Bearer",
+        expires_in: 1800,
+        hassUrl,
+        clientId,
+        expires: 9999999999999, // Far future expiry
+        refresh_token: ""
+      })
+    };
+  }
+
+  /**
+   * Waits for Home Assistant page to finish loading
+   * Checks for home-assistant element and panel resolver
+   * @param {import('puppeteer').Page} page - Puppeteer page instance
+   * @private
+   */
+  async waitForPageLoad(page) {
+    try {
+      await page.waitForFunction(
+        () => {
+          const haEl = document.querySelector("home-assistant");
+          if (!haEl) return false;
+
+          const mainEl = haEl.shadowRoot?.querySelector("home-assistant-main");
+          if (!mainEl) return false;
+
+          const panelResolver = mainEl.shadowRoot?.querySelector("partial-panel-resolver");
+          if (!panelResolver || panelResolver._loading) return false;
+
+          const panel = panelResolver.children[0];
+          if (!panel) return false;
+
+          return !("_loading" in panel) || !panel._loading;
+        },
+        { timeout: 10000, polling: 100 }
+      );
+    } catch (err) {
+      console.log("Timeout waiting for HA to finish loading");
+    }
+  }
+
+  /**
+   * Dismisses any visible toast notifications and sets zoom level
+   * @param {import('puppeteer').Page} page - Puppeteer page instance
+   * @param {number} zoom - Zoom level to apply
+   * @returns {Promise<boolean>} Whether a toast was dismissed
+   * @private
+   */
+  async dismissToastsAndSetZoom(page, zoom) {
+    return page.evaluate((zoomLevel) => {
+      document.body.style.zoom = zoomLevel;
+
+      // Try to find and dismiss toast notification
+      const haEl = document.querySelector("home-assistant");
+      if (!haEl) return false;
+
+      const notifyEl = haEl.shadowRoot?.querySelector("notification-manager");
+      if (!notifyEl) return false;
+
+      const actionEl = notifyEl.shadowRoot.querySelector("ha-toast *[slot=action]");
+      if (!actionEl) return false;
+
+      actionEl.click();
+      return true;
+    }, zoom);
+  }
+
+  /**
+   * Updates language setting in Home Assistant
+   * @param {import('puppeteer').Page} page - Puppeteer page instance
+   * @param {string|undefined} lang - Language code or undefined for default
+   * @private
+   */
+  async updateLanguage(page, lang) {
+    await page.evaluate((newLang) => {
+      document.querySelector("home-assistant")._selectLanguage(newLang, false);
+    }, lang || "en");
+  }
+
+  /**
+   * Updates theme and dark mode settings
+   * @param {import('puppeteer').Page} page - Puppeteer page instance
+   * @param {string|undefined} theme - Theme name
+   * @param {boolean} dark - Whether to enable dark mode
+   * @private
+   */
+  async updateTheme(page, theme, dark) {
+    await page.evaluate(
+      ({ theme, dark }) => {
+        document.querySelector("home-assistant").dispatchEvent(
+          new CustomEvent("settheme", {
+            detail: { theme, dark }
+          })
+        );
+      },
+      { theme: theme || "", dark }
+    );
+  }
+
+  // ===========================================================================
+  // IMAGE PROCESSING HELPERS
+  // ===========================================================================
+
+  /**
+   * Converts Sharp instance to requested output format
+   * @param {import('sharp').Sharp} sharpInstance - Sharp image instance
+   * @param {string} format - Output format (png, jpeg, webp, bmp)
+   * @param {Object} options - Additional options
+   * @param {number} [options.bitsPerPixel] - Bits per pixel for BMP
+   * @param {number} [options.width] - Image width for BMP
+   * @param {number} [options.height] - Image height for BMP
+   * @param {number} [options.einkColors] - E-ink color count for PNG
+   * @returns {Promise<Buffer>} Encoded image buffer
+   * @private
+   */
+  async convertToFormat(sharpInstance, format, options = {}) {
+    if (format === "jpeg") {
+      return sharpInstance.jpeg().toBuffer();
+    }
+
+    if (format === "webp") {
+      return sharpInstance.webp().toBuffer();
+    }
+
+    if (format === "bmp") {
+      const { data, info } = await sharpInstance.raw().toBuffer({ resolveWithObject: true });
+      const bitsPerPixel = options.bitsPerPixel || 24;
+      const bmpEncoder = new BMPEncoder(info.width, info.height, bitsPerPixel);
+      return bmpEncoder.encode(data);
+    }
+
+    // PNG with optional color reduction
+    if (options.einkColors) {
+      return sharpInstance.png({ colours: options.einkColors }).toBuffer();
+    }
+
+    return sharpInstance.png().toBuffer();
+  }
+
+  /**
+   * Maps e-ink color count to bits per pixel for BMP encoding
+   * @param {number} einkColors - Number of colors
+   * @returns {number} Bits per pixel
+   * @private
+   */
+  einkColorsToBpp(einkColors) {
+    if (einkColors === 2) return 1;
+    if (einkColors === 4) return 2;
+    if (einkColors === 16) return 4;
+    return 8;
+  }
+
+  // ===========================================================================
+  // MAIN PUBLIC METHODS
+  // ===========================================================================
+
+  /**
+   * Navigates to a Home Assistant page and applies settings
+   * @param {Object} params - Navigation parameters
+   * @param {string} params.pagePath - Page path to navigate to
+   * @param {Object} params.viewport - Viewport dimensions {width, height}
+   * @param {number} [params.extraWait] - Additional wait time in ms
+   * @param {number} [params.zoom=1] - Zoom level
+   * @param {string} [params.lang] - Language code
+   * @param {string} [params.theme] - Theme name
+   * @param {boolean} [params.dark=false] - Enable dark mode
+   * @returns {Promise<{time: number}>} Navigation timing result
+   * @throws {Error} If browser is busy
+   * @throws {CannotOpenPageError} If page fails to load
+   */
+  async navigatePage({ pagePath, viewport, extraWait, zoom = 1, lang, theme, dark }) {
+    if (this.busy) throw new Error("Browser is busy");
+
+    const start = Date.now();
     this.busy = true;
     const headerHeight = Math.round(HEADER_HEIGHT * zoom);
 
     try {
       const page = await this.getPage();
 
-      // We add 56px to the height to account for the header
-      // We'll cut that off from the screenshot
+      // Add header height to viewport (will be clipped in screenshot)
       viewport.height += headerHeight;
 
+      // Update viewport if changed
       const curViewport = page.viewport();
-
-      if (
-        !curViewport ||
-        curViewport.width !== viewport.width ||
-        curViewport.height !== viewport.height
-      ) {
+      if (!curViewport || curViewport.width !== viewport.width || curViewport.height !== viewport.height) {
         await page.setViewport(viewport);
       }
 
-      let defaultWait = isAddOn ? 750 : 500;
-      let openedNewPage = false;
+      let waitTime = DEFAULT_WAIT_TIME;
+      let isFirstNavigation = false;
 
-      // If we're still on about:blank, navigate to HA UI
+      // Handle navigation based on current state
       if (this.lastRequestedPath === undefined) {
-        openedNewPage = true;
+        // First navigation - inject auth and open page
+        isFirstNavigation = true;
 
-        // Ensure we have tokens when we open the UI
-        const clientId = new URL("/", this.homeAssistantUrl).toString(); // http://homeassistant.local:8123/
-        const hassUrl = clientId.substring(0, clientId.length - 1); // http://homeassistant.local:8123
-        const browserLocalStorage = {
-          ...hassLocalStorageDefaults,
-          hassTokens: JSON.stringify({
-            access_token: this.token,
-            token_type: "Bearer",
-            expires_in: 1800,
-            hassUrl,
-            clientId,
-            expires: 9999999999999,
-            refresh_token: "",
-          }),
-        };
-        const evaluateIdentifier = await page.evaluateOnNewDocument(
-          (hassLocalStorage) => {
-            for (const [key, value] of Object.entries(hassLocalStorage)) {
+        const browserLocalStorage = this.buildAuthStorage();
+        const evaluateId = await page.evaluateOnNewDocument(
+          (storage) => {
+            for (const [key, value] of Object.entries(storage)) {
               localStorage.setItem(key, value);
             }
           },
-          browserLocalStorage,
+          browserLocalStorage
         );
 
-        // Open the HA UI
         const pageUrl = new URL(pagePath, this.homeAssistantUrl).toString();
         const response = await page.goto(pageUrl);
+
         if (!response.ok()) {
           throw new CannotOpenPageError(response.status(), pageUrl);
         }
-        page.removeScriptToEvaluateOnNewDocument(evaluateIdentifier.identifier);
 
-        // Launching browser is slow inside the add-on, give it extra time
-        if (isAddOn) {
-          defaultWait += 2000;
-        }
+        page.removeScriptToEvaluateOnNewDocument(evaluateId.identifier);
+
+        // Add extra wait for cold start (loading icons, images, etc.)
+        if (isAddOn) waitTime += COLD_START_EXTRA_WAIT;
+
       } else if (this.lastRequestedPath !== pagePath) {
-        // mimick HA frontend navigation (no full reload)
-        await page.evaluate((pagePath) => {
+        // Navigate without full reload using HA's internal navigation
+        await page.evaluate((path) => {
           history.replaceState(
             history.state?.root ? { root: true } : null,
             "",
-            pagePath,
+            path
           );
           const event = new Event("location-changed");
           event.detail = { replace: true };
           window.dispatchEvent(event);
         }, pagePath);
+
       } else {
-        // We are already on the correct page
-        defaultWait = 0;
+        // Already on correct page - minimal wait
+        waitTime = 0;
       }
 
       this.lastRequestedPath = pagePath;
 
-      // Dismiss any dashboard update avaiable toasts
-      if (
-        !openedNewPage &&
-        (await page.evaluate((zoomLevel) => {
-          // Set zoom level
-          document.body.style.zoom = zoomLevel;
-
-          const haEl = document.querySelector("home-assistant");
-          if (!haEl) return false;
-          const notifyEl = haEl.shadowRoot?.querySelector(
-            "notification-manager",
-          );
-          if (!notifyEl) return false;
-          const actionEl = notifyEl.shadowRoot.querySelector(
-            "ha-toast *[slot=action]",
-          );
-          if (!actionEl) return false;
-          actionEl.click();
-          return true;
-        }, zoom))
-      ) {
-        // If we dismissed a toast, let's wait a bit longer
-        defaultWait += 1000;
+      // Dismiss toasts and set zoom (only if not first navigation)
+      if (!isFirstNavigation) {
+        const dismissedToast = await this.dismissToastsAndSetZoom(page, zoom);
+        if (dismissedToast) waitTime += 1000;
       } else {
-        // Set zoom level
         await page.evaluate((zoomLevel) => {
           document.body.style.zoom = zoomLevel;
         }, zoom);
       }
 
-      // Wait for the page to be loaded.
-      try {
-        await page.waitForFunction(
-          () => {
-            const haEl = document.querySelector("home-assistant");
-            if (!haEl) return false;
-            const mainEl = haEl.shadowRoot?.querySelector(
-              "home-assistant-main",
-            );
-            if (!mainEl) return false;
-            const panelResolver = mainEl.shadowRoot?.querySelector(
-              "partial-panel-resolver",
-            );
-            if (!panelResolver || panelResolver._loading) {
-              return false;
-            }
+      // Wait for page to fully load
+      await this.waitForPageLoad(page);
 
-            const panel = panelResolver.children[0];
-            if (!panel) return false;
-
-            return !("_loading" in panel) || !panel._loading;
-          },
-          {
-            timeout: 10000,
-            polling: 100,
-          },
-        );
-      } catch (err) {
-        console.log("Timeout waiting for HA to finish loading");
-      }
-
-      // Update language
-      // Should really be done via localStorage.selectedLanguage
-      // but that doesn't seem to work
+      // Update language if changed
       if (lang !== this.lastRequestedLang) {
-        await page.evaluate((newLang) => {
-          document
-            .querySelector("home-assistant")
-            ._selectLanguage(newLang, false);
-        }, lang || "en");
+        await this.updateLanguage(page, lang);
         this.lastRequestedLang = lang;
-        defaultWait += 1000;
+        waitTime += 1000;
       }
 
-      // Update theme and dark mode
-      if (
-        theme !== this.lastRequestedTheme ||
-        dark !== this.lastRequestedDarkMode
-      ) {
-        await page.evaluate(
-          ({ theme, dark }) => {
-            document.querySelector("home-assistant").dispatchEvent(
-              new CustomEvent("settheme", {
-                detail: { theme, dark },
-              }),
-            );
-          },
-          { theme: theme || "", dark },
-        );
+      // Update theme if changed
+      if (theme !== this.lastRequestedTheme || dark !== this.lastRequestedDarkMode) {
+        await this.updateTheme(page, theme, dark);
         this.lastRequestedTheme = theme;
         this.lastRequestedDarkMode = dark;
-        defaultWait += 500;
+        waitTime += 500;
       }
 
-      // wait for the work to be done.
-      // Not sure yet how to decide that?
-      if (extraWait === undefined) {
-        extraWait = defaultWait;
-      }
-      if (extraWait) {
-        await new Promise((resolve) => setTimeout(resolve, extraWait));
+      // Apply wait time
+      const finalWait = extraWait !== undefined ? extraWait : waitTime;
+      if (finalWait > 0) {
+        await new Promise((resolve) => setTimeout(resolve, finalWait));
       }
 
-      const end = Date.now();
-      return { time: end - start };
+      return { time: Date.now() - start };
+
     } finally {
       this.busy = false;
     }
   }
 
-  async screenshotPage({ viewport, einkColors, invert, zoom, format, rotate, dithering }) {
-    let start = new Date();
-    if (this.busy) {
-      throw new Error("Browser is busy");
-    }
-    start = new Date();
+  /**
+   * Captures a screenshot of the current page with optional processing
+   * @param {Object} params - Screenshot parameters
+   * @param {Object} params.viewport - Viewport dimensions {width, height}
+   * @param {number} [params.einkColors] - E-ink color reduction (2, 4, 7, 16)
+   * @param {boolean} [params.invert=false] - Invert colors
+   * @param {number} [params.zoom=1] - Zoom level
+   * @param {string} [params.format='png'] - Output format
+   * @param {number} [params.rotate] - Rotation angle (90, 180, 270)
+   * @param {Object} [params.dithering] - Dithering configuration
+   * @returns {Promise<{image: Buffer, time: number}>} Screenshot result
+   * @throws {Error} If browser is busy
+   */
+  async screenshotPage({ viewport, einkColors, invert, zoom = 1, format = "png", rotate, dithering }) {
+    if (this.busy) throw new Error("Browser is busy");
+
+    const start = Date.now();
     this.busy = true;
     const headerHeight = Math.round(HEADER_HEIGHT * zoom);
 
     try {
       const page = await this.getPage();
 
-      // If eink processing OR advanced dithering is requested, we need PNG input for processing.
-      // Otherwise, use the requested format.
-      const needsProcessing = einkColors || dithering?.enabled || format == "bmp";
+      // Determine if we need PNG for processing
+      const needsProcessing = einkColors || dithering?.enabled || format === "bmp";
       const screenshotType = needsProcessing ? "png" : format;
 
+      // Capture screenshot (clipping header)
       let image = await page.screenshot({
         type: screenshotType,
         clip: {
           x: 0,
           y: headerHeight,
           width: viewport.width,
-          height: viewport.height - headerHeight,
-        },
+          height: viewport.height - headerHeight
+        }
       });
 
       let sharpInstance = sharp(image);
 
+      // Apply rotation
       if (rotate) {
         sharpInstance = sharpInstance.rotate(rotate);
       }
 
-      // Apply advanced dithering if enabled
+      // Process with advanced dithering
       if (dithering?.enabled) {
-        // Convert to PNG buffer for dithering
-        image = await sharpInstance.png().toBuffer();
-
-        const startDither = Date.now();
-        image = await applyDithering(image, {
-          method: dithering.method || 'floyd-steinberg',
-          bitDepth: dithering.bitDepth || 2,
-          gammaCorrection: dithering.gammaCorrection !== false,
-          blackLevel: dithering.blackLevel || 0,
-          whiteLevel: dithering.whiteLevel || 100,
-        });
-        console.debug(`Advanced dithering took ${Date.now() - startDither}ms`);
-
-        // Create new sharp instance from dithered image
-        sharpInstance = sharp(image);
-
-        // Convert to requested format
-        if (format === "jpeg") {
-          sharpInstance = sharpInstance.jpeg();
-          image = await sharpInstance.toBuffer();
-        } else if (format === "webp") {
-          sharpInstance = sharpInstance.webp();
-          image = await sharpInstance.toBuffer();
-        } else if (format === "bmp") {
-          sharpInstance = sharpInstance.raw();
-          const { data, info } = await sharpInstance.toBuffer({
-            resolveWithObject: true,
-          });
-          const bitsPerPixel = dithering.bitDepth === 1 ? 1 :
-                               dithering.bitDepth === 2 ? 2 :
-                               dithering.bitDepth === 4 ? 4 : 8;
-          const bmpEncoder = new BMPEncoder(info.width, info.height, bitsPerPixel);
-          image = bmpEncoder.encode(data);
-        } else {
-          sharpInstance = sharpInstance.png();
-          image = await sharpInstance.toBuffer();
-        }
-
-        return {
-          image,
-          time: Date.now() - start.getTime(),
-        };
+        image = await this.applyAdvancedDithering(sharpInstance, format, dithering);
+        return { image, time: Date.now() - start };
       }
 
-      // Legacy e-ink processing for backward compatibility
-      if (einkColors === 2) {
-        sharpInstance = sharpInstance.threshold(220, {
-          greyscale: true,
-        });
-        if (invert) {
-          sharpInstance = sharpInstance.negate({
-            alpha: false,
-          });
-        }
-      }
-
-      // Legacy eink color output processing for backward compatibility
+      // Process with legacy e-ink mode
       if (einkColors) {
-        if (einkColors === 2) {
-          sharpInstance = sharpInstance.toColourspace("b-w");
-        }
-        if (format == "bmp") {
-          sharpInstance = sharpInstance.raw();
-
-          const { data, info } = await sharpInstance.toBuffer({
-            resolveWithObject: true,
-          });
-          let bitsPerPixel = 8;
-          if (einkColors === 2) {
-            bitsPerPixel = 1;
-          } else if (einkColors === 4) {
-            bitsPerPixel = 2;
-          } else if (einkColors === 16) {
-            bitsPerPixel = 4;
-          }
-          const bmpEncoder = new BMPEncoder(
-            info.width,
-            info.height,
-            bitsPerPixel,
-          );
-          image = bmpEncoder.encode(data);
-        } else if (format === "jpeg") {
-          sharpInstance = sharpInstance.jpeg();
-          image = await sharpInstance.toBuffer();
-        } else if (format === "webp") {
-          sharpInstance = sharpInstance.webp();
-          image = await sharpInstance.toBuffer();
-        } else {
-          sharpInstance = sharpInstance.png({
-            colours: einkColors,
-          });
-          image = await sharpInstance.toBuffer();
-        }
-      }
-      // Format conversion for non-eink or dithered images
-      else if (format === "jpeg") {
-        sharpInstance = sharpInstance.jpeg();
-        image = await sharpInstance.toBuffer();
-      } else if (format === "webp") {
-        sharpInstance = sharpInstance.webp();
-        image = await sharpInstance.toBuffer();
-      } else if (format === "bmp") {
-        sharpInstance = sharpInstance.raw();
-        const { data, info } = await sharpInstance.toBuffer({
-          resolveWithObject: true,
-        });
-        const bmpEncoder = new BMPEncoder(info.width, info.height, 24);
-        image = bmpEncoder.encode(data);
-      } else {
-        sharpInstance = sharpInstance.png();
-        image = await sharpInstance.toBuffer();
+        image = await this.applyLegacyEink(sharpInstance, format, einkColors, invert);
+        return { image, time: Date.now() - start };
       }
 
-      const end = Date.now();
-      return {
-        image,
-        time: end - start,
-      };
+      // Standard format conversion
+      image = await this.convertToFormat(sharpInstance, format);
+      return { image, time: Date.now() - start };
+
     } catch (err) {
-      // trigger a full page navigation on next request
+      // Reset navigation state on error to force fresh load
       this.lastRequestedPath = undefined;
       throw err;
+
     } finally {
       this.busy = false;
     }
+  }
+
+  /**
+   * Applies advanced dithering processing to image
+   * @param {import('sharp').Sharp} sharpInstance - Sharp image instance
+   * @param {string} format - Output format
+   * @param {Object} dithering - Dithering configuration
+   * @returns {Promise<Buffer>} Processed image buffer
+   * @private
+   */
+  async applyAdvancedDithering(sharpInstance, format, dithering) {
+    // Convert to PNG for dithering
+    let image = await sharpInstance.png().toBuffer();
+
+    const startDither = Date.now();
+    image = await applyDithering(image, {
+      method: dithering.method || "floyd-steinberg",
+      bitDepth: dithering.bitDepth || 2,
+      gammaCorrection: dithering.gammaCorrection !== false,
+      blackLevel: dithering.blackLevel || 0,
+      whiteLevel: dithering.whiteLevel || 100
+    });
+    console.debug(`Advanced dithering took ${Date.now() - startDither}ms`);
+
+    // Convert to final format
+    const newSharp = sharp(image);
+    const bitsPerPixel = dithering.bitDepth || 2;
+
+    return this.convertToFormat(newSharp, format, { bitsPerPixel });
+  }
+
+  /**
+   * Applies legacy e-ink color reduction processing
+   * @param {import('sharp').Sharp} sharpInstance - Sharp image instance
+   * @param {string} format - Output format
+   * @param {number} einkColors - Number of colors (2, 4, 7, 16)
+   * @param {boolean} invert - Whether to invert colors
+   * @returns {Promise<Buffer>} Processed image buffer
+   * @private
+   */
+  async applyLegacyEink(sharpInstance, format, einkColors, invert) {
+    // Apply threshold for 2-color e-ink
+    if (einkColors === 2) {
+      sharpInstance = sharpInstance.threshold(220, { greyscale: true });
+      if (invert) {
+        sharpInstance = sharpInstance.negate({ alpha: false });
+      }
+      sharpInstance = sharpInstance.toColourspace("b-w");
+    }
+
+    const bitsPerPixel = this.einkColorsToBpp(einkColors);
+
+    return this.convertToFormat(sharpInstance, format, {
+      bitsPerPixel,
+      einkColors
+    });
   }
 }

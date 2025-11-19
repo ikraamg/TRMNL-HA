@@ -23,9 +23,14 @@ ports:
 ports_description:
   10000/tcp: "Web UI (use ingress instead)"
 
+# Configuration options
 options:
   access_token: ""
   home_assistant_url: "http://homeassistant:8123"
+  keep_browser_open: false
+
+# Schema for options validation
 schema:
   access_token: str
   home_assistant_url: str?
+  keep_browser_open: bool?

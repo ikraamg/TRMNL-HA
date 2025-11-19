@@ -111,5 +111,5 @@ export function deleteSchedule(id) {
  * @returns {string} Unique ID
  */
 function generateId() {
-  return `schedule_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `schedule_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
 }
