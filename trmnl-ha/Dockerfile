@@ -40,6 +40,10 @@ WORKDIR /app
 
 # Install dependencies first for better caching
 COPY ha-trmnl/package*.json ./
+
+# Skip Puppeteer's bundled Chrome download - we use system Chromium instead
+# This prevents segfaults on aarch64 during Chrome download
+ENV PUPPETEER_SKIP_DOWNLOAD=true
 RUN npm ci --unsafe-perm
 
 # Copy application code
